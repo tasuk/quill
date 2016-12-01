@@ -12,6 +12,10 @@ case class ScalarLiftToken(lift: ScalarLift) extends Token {
   override def toString = s"lift(${lift.name})"
 }
 
+case class CaseClassLiftToken(lift: CaseClassLift) extends Token {
+  override def toString = s"lift(${lift.name})"
+}
+
 case class Statement(tokens: List[Token]) extends Token {
   override def toString = tokens.mkString
 }

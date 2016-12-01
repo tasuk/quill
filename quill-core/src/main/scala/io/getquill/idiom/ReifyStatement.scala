@@ -10,12 +10,13 @@ object ReifyStatement {
     emptyQuery:         String,
     statement:          Statement,
     forProbing:         Boolean
-  ): (String, List[ScalarLift]) = {
-    def apply(acc: (String, List[ScalarLift]), token: Token): (String, List[ScalarLift]) =
+  ): (String, List[Lift]) = {
+    def apply(acc: (String, List[Lift]), token: Token): (String, List[Lift]) =
       (acc, token) match {
-        case ((s1, liftings), StringToken(s2))       => (s"$s1$s2", liftings)
-        case ((s1, liftings), Statement(tokens))     => tokens.foldLeft((s1, liftings))(apply)
-        case ((s1, liftings), ScalarLiftToken(lift)) => (s"$s1${liftingPlaceholder(liftings.size)}", liftings :+ lift)
+        case ((s1, liftings), StringToken(s2))          => (s"$s1$s2", liftings)
+        case ((s1, liftings), Statement(tokens))        => tokens.foldLeft((s1, liftings))(apply)
+        case ((s1, liftings), ScalarLiftToken(lift))    => (s"$s1${liftingPlaceholder(liftings.size)}", liftings :+ lift)
+        case ((s1, liftings), CaseClassLiftToken(lift)) => (s"$s1${liftingPlaceholder(liftings.size)}", liftings :+ lift)
       }
     val expanded =
       forProbing match {

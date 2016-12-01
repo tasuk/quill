@@ -15,6 +15,7 @@ import io.getquill.idiom.Statement
 import io.getquill.idiom.Token
 import io.getquill.idiom.StringToken
 import io.getquill.idiom.ScalarLiftToken
+import io.getquill.idiom.CaseClassLiftToken
 import io.getquill.idiom.ReifyStatement
 import io.getquill.idiom.LoadNaming
 import scala.util.Success
@@ -45,9 +46,10 @@ trait ContextMacro extends Quotation {
     }
 
   private implicit val tokenLiftable: Liftable[Token] = Liftable[Token] {
-    case StringToken(string)   => q"io.getquill.idiom.StringToken($string)"
-    case ScalarLiftToken(lift) => q"io.getquill.idiom.ScalarLiftToken(${lift: Lift})"
-    case Statement(tokens)     => q"io.getquill.idiom.Statement(List(..$tokens))"
+    case StringToken(string)      => q"io.getquill.idiom.StringToken($string)"
+    case ScalarLiftToken(lift)    => q"io.getquill.idiom.ScalarLiftToken(${lift: Lift})"
+    case CaseClassLiftToken(lift) => q"io.getquill.idiom.CaseClassLiftToken(${lift: Lift})"
+    case Statement(tokens)        => q"io.getquill.idiom.Statement(List(..$tokens))"
   }
 
   private def translateStatic(ast: Ast): Tree = {
