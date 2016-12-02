@@ -84,8 +84,8 @@ class ActionMacro(val c: MacroContext)
               lift match {
                 case ScalarQueryLift(name, batch: Tree, encoder: Tree) =>
                   ScalarValueLift("value", value, encoder)
-                case CaseClassQueryLift(name, batch: Tree) =>
-                  CaseClassValueLift("value", value)
+                case CaseClassQueryLift(name, batch: Tree, encoder: Tree) =>
+                  CaseClassValueLift("value", value, encoder)
               }
             val (ast, _) = reifyLiftings(BetaReduction(body, alias -> nestedLift))
             c.untypecheck {

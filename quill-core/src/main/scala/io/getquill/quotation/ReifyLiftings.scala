@@ -20,17 +20,22 @@ trait ReifyLiftings {
   private def encode(name: String) =
     TermName(NameTransformer.encode(name))
 
-  private case class Reified(value: Tree, encoder: Option[Tree])
+  private sealed trait Reified {
+    val value: Tree
+    val encoder: Tree
+  }
+  private case class ReifiedScalar(value: Tree, encoder: Tree) extends Reified
+  private case class ReifiedCaseClass(value: Tree, encoder: Tree) extends Reified
 
   private case class ReifyLiftings(state: collection.Map[TermName, Reified])
     extends StatefulTransformer[collection.Map[TermName, Reified]] {
 
     private def reify(lift: Lift) =
       lift match {
-        case ScalarValueLift(name, value: Tree, encoder: Tree) => Reified(value, Some(encoder))
-        case CaseClassValueLift(name, value: Tree)             => Reified(value, None)
-        case ScalarQueryLift(name, value: Tree, encoder: Tree) => Reified(value, Some(encoder))
-        case CaseClassQueryLift(name, value: Tree)             => Reified(value, None)
+        case ScalarValueLift(name, value: Tree, encoder: Tree)    => ReifiedScalar(value, encoder)
+        case ScalarQueryLift(name, value: Tree, encoder: Tree)    => ReifiedScalar(value, encoder)
+        case CaseClassValueLift(name, value: Tree, encoder: Tree) => ReifiedCaseClass(value, encoder)
+        case CaseClassQueryLift(name, value: Tree, encoder: Tree) => ReifiedCaseClass(value, encoder)
       }
 
     override def apply(ast: Ast) =
@@ -39,16 +44,17 @@ trait ReifyLiftings {
         case ast: Lift =>
           (ast, ReifyLiftings(state + (encode(ast.name) -> reify(ast))))
 
-        case Property(CaseClassValueLift(name, v: Tree), prop) =>
+        case Property(CaseClassValueLift(name, v: Tree, e: Tree), prop) =>
           val term = TermName(prop)
           val tpe = v.tpe.member(term).typeSignatureIn(v.tpe)
           val merge = c.typecheck(q"$v.$term")
           OptionalTypecheck(c)(q"implicitly[${c.prefix}.Encoder[$tpe]]") match {
-            case Some(enc) => apply(ScalarValueLift(merge.toString, merge, enc))
-            case None =>
+            // TODO differentiate
+            case enc => apply(ScalarValueLift(merge.toString, merge, enc))
+            case enc =>
               tpe.baseType(c.symbolOf[Product]) match {
                 case NoType => c.fail(s"Can't find an encoder for the lifted case class property '$merge'")
-                case _      => apply(CaseClassValueLift(merge.toString, merge))
+                case _      => apply(CaseClassValueLift(merge.toString, merge, enc))
               }
           }
 
@@ -61,12 +67,12 @@ trait ReifyLiftings {
                 lift match {
                   case ScalarValueLift(name, value, encoder) =>
                     ScalarValueLift(s"$ref.$name", q"$nested.value", q"$nested.encoder")
-                  case CaseClassValueLift(name, value) =>
-                    CaseClassValueLift(s"$ref.$name", q"$nested.value")
+                  case CaseClassValueLift(name, value, encoder) =>
+                    CaseClassValueLift(s"$ref.$name", q"$nested.value", q"$nested.encoder")
                   case ScalarQueryLift(name, value, encoder) =>
                     ScalarQueryLift(s"$ref.$name", q"$nested.value", q"$nested.encoder")
-                  case CaseClassQueryLift(name, value) =>
-                    CaseClassQueryLift(s"$ref.$name", q"$nested.value")
+                  case CaseClassQueryLift(name, value, encoder) =>
+                    CaseClassQueryLift(s"$ref.$name", q"$nested.value", q"$nested.encoder")
                 }
             }
           apply(newAst)
@@ -82,12 +88,12 @@ trait ReifyLiftings {
         ReifyLiftings(collection.Map.empty)(BetaReduction(ast)) match {
           case (ast, transformer) =>
             val trees =
-              for ((name, Reified(value, encoder)) <- transformer.state) yield {
-                encoder match {
-                  case Some(encoder) =>
+              for ((name, reified) <- transformer.state) yield {
+                reified match {
+                  case ReifiedScalar(value, encoder) =>
                     q"val $name = io.getquill.quotation.ScalarValueLifting($value, $encoder)"
-                  case None =>
-                    q"val $name = io.getquill.quotation.CaseClassValueLifting($value)"
+                  case ReifiedCaseClass(value, encoder) =>
+                    q"val $name = io.getquill.quotation.CaseClassValueLifting($value, $encoder)"
                 }
               }
             (ast, q"val $liftings = new { ..$trees }")

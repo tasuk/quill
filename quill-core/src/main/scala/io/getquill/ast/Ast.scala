@@ -120,14 +120,13 @@ case class QuotedReference(tree: Any, ast: Ast) extends Ast
 sealed trait Lift extends Ast {
   val name: String
   val value: Any
-}
-
-sealed trait ScalarLift extends Lift {
   val encoder: Any
 }
+
+sealed trait ScalarLift extends Lift
 case class ScalarValueLift(name: String, value: Any, encoder: Any) extends ScalarLift
 case class ScalarQueryLift(name: String, value: Any, encoder: Any) extends ScalarLift
 
 sealed trait CaseClassLift extends Lift
-case class CaseClassValueLift(name: String, value: Any) extends CaseClassLift
-case class CaseClassQueryLift(name: String, value: Any) extends CaseClassLift
+case class CaseClassValueLift(name: String, value: Any, encoder: Any) extends CaseClassLift
+case class CaseClassQueryLift(name: String, value: Any, encoder: Any) extends CaseClassLift
